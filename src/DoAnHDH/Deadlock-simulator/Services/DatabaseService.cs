@@ -32,5 +32,11 @@ namespace Deadlock_simulator.Services
                 return db.Query<Process>("SELECT * FROM Processes").ToList();
             }
         }
+
+        public void UpdateProcess(Process process)
+        {
+           
+            throw new NotImplementedException();
+        }
     }
 }

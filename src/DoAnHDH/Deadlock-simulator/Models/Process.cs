@@ -19,5 +19,9 @@ namespace Deadlock_simulator.Models
         public string Status { get => _status; set => _status = value; }
         public int? HoldingResourceId { get => _holdingResourceId; set => _holdingResourceId = value; }
         public int? WaitingResourceId { get => _waitingResourceId; set => _waitingResourceId = value; }
+        public Dictionary<int, int> Allocation { get; set; } = new();
+        public Dictionary<int, int> Max { get; set; } = new();
     }
+
 }
+

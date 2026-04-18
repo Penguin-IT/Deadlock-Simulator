@@ -1,12 +1,11 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Resources;
-using System.Security.Cryptography.X509Certificates;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using Deadlock_simulator.Models;
 using Deadlock_simulator.Services;
 
@@ -14,7 +13,7 @@ namespace Deadlock_simulator.ViewModels
 {
     public class ViewModel1 : BaseViewModel
     {
-        private  DatabaseService _db;
+        private DatabaseService _db;
 
         private ObservableCollection<Resource> listResource;
         public ObservableCollection<Resource> ListResource
@@ -38,115 +37,39 @@ namespace Deadlock_simulator.ViewModels
             }
         }
 
-        //khoi tao dulieu
+        //khởi tạo dữ liệu
         public ViewModel1()
         {
-            _db=new DatabaseService();
+            _db = new DatabaseService();
 
             ListResource = new ObservableCollection<Resource>();
             ListProcess = new ObservableCollection<Process>();
 
 
         }
-
-
-        // Phát hiện deadlock
-        //kiem traa vòng lạp
-        public bool IsDeadlock()
+        // Tính toán tài nguyên có sẵn dựa trên tổng số lượng và số lượng đã cấp phát
+        private Dictionary<int, int> CalculateAvailable()
         {
-            var graph = BuildGraph();
-            HashSet<string> visited = new HashSet<string>();
-            HashSet<string> stack = new HashSet<string>();
+            var available = new Dictionary<int, int>();
 
-            foreach (var node in graph.Keys)
+            foreach (var r in ListResource)
             {
-                if (HasCycle(node, graph, visited, stack)) return true;
-            }
-            return false;
-        }
+                int allocated = ListProcess
+                    .Where(p => p.Allocation.ContainsKey(r.ResourceId))
+                    .Sum(p => p.Allocation[r.ResourceId]);
 
-        private bool HasCycle(string node, Dictionary<string, List<string>> Graph, HashSet<string> visited, HashSet<string> stack)
-        {
-            if (stack.Contains(node)) return true;
-            if (visited.Contains(node)) return false;
-
-            visited.Add(node);
-            stack.Add(node);
-
-            if (Graph.ContainsKey(node))
-            {
-                foreach (var neighbor in Graph[node])
-                {
-                    if (HasCycle(neighbor, Graph, visited, stack))
-                        return true;
-                }
+                available[r.ResourceId] = r.Total - allocated;
             }
 
-            stack.Remove(node);
-            return false; // Quan trọng: phải có dòng này!
+            return available;
         }
-        private Dictionary<string, List<string>> BuildGraph()
+        // Kiểm tra nếu tài nguyên có thể dùng chung thì không cần xét đến nó trong việc phát hiện deadlock
+        private bool IsShareableResource(Resource resource)
         {
-            var graph = new Dictionary<string, List<string>>();
-            var processes = ListProcess.ToList();
-            var resources = ListResource.ToList();
-
-            foreach (var p in processes)
-            {
-                if (!graph.ContainsKey(p.ProcessName)) graph[p.ProcessName] = new List<string>();
-
-                // Cạnh cấp phát: Resource -> Process 
-               if(p.HoldingResourceId !=null)
-                {
-                    var res = resources.FirstOrDefault(t => t.ResourceId == p.HoldingResourceId);
-                    if(res!=null)
-                        graph[p.ProcessName].Add(res.ResourceName);
-                }
-
-                // Cạnh yêu cầu: Process -> Resource (Ai đang đợi?)
-                if (p.WaitingResourceId != null)
-                {
-                    var res = resources.FirstOrDefault(r => r.ResourceId == p.WaitingResourceId);
-                    if (res != null)
-                    {
-                        graph[p.ProcessName].Add(res.ResourceName);
-                    }
-                }
-            }
-            return graph;
+            return resource != null && resource.IsShareable;
         }
-        //Thuật toán loại trừ tương hỗ 
 
-
-
-
-
-
-        // Thuật toán Đợi vòng
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        public void LoadAllData()
-        {
-            var service = new DatabaseService();
-
-            var reData = service.GetAllResources();
-            ListResource = new ObservableCollection<Resource>(reData);
-
-            var proData = service.GetAllProcesses();
-            ListProcess = new ObservableCollection<Process>(proData);
-        }
+       
+       
     }
 }
