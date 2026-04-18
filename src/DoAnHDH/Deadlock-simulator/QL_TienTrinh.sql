@@ -4,34 +4,62 @@ GO
 USE QLTIENTRINH;
 GO
 
---Tạo bảng Resources
-CREATE TABLE Resources (
+--Tạo bảng Resource
+CREATE TABLE Resource (
     ResourceId INT PRIMARY KEY IDENTITY(1,1),
     ResourceName NVARCHAR(100) NOT NULL,
-    IsShareable BIT DEFAULT 0, -- 0: Độc quyền, 1: Chia sẻ
-    HierarchyOrder INT DEFAULT 0, -- Thứ tự ưu tiên (Dùng cho Circular Wait)
-    IsAvailable BIT DEFAULT 1 -- Trạng thái tài nguyên
+    IsShareable BIT DEFAULT 0,       -- có chia sẻ hay không
+    HierarchyOrder INT DEFAULT 0,    -- dùng cho circular wait
+    Total INT NOT NULL DEFAULT 1     -- quan trọng cho Banker
 );
 
--- Tạo bảng Processes (Đã thêm IDENTITY)
-CREATE TABLE Processes (
-    ProcessId INT PRIMARY KEY IDENTITY(1,1), -- Thêm IDENTITY ở đây
+-- Tạo bảng Process
+CREATE TABLE Process (
+    ProcessId INT PRIMARY KEY IDENTITY(1,1),
     ProcessName NVARCHAR(100) NOT NULL,
-    Status NVARCHAR(50) DEFAULT 'Ready', -- Ready, Running, Waiting...
+    Status NVARCHAR(50) DEFAULT 'Ready',
+
     HoldingResourceId INT NULL,
     WaitingResourceId INT NULL,
-    CONSTRAINT FK_Holding FOREIGN KEY (HoldingResourceId) REFERENCES Resources(ResourceId),
-    CONSTRAINT FK_Waiting FOREIGN KEY (WaitingResourceId) REFERENCES Resources(ResourceId)
+
+    CONSTRAINT FK_Holding FOREIGN KEY (HoldingResourceId) REFERENCES Resource(ResourceId),
+    CONSTRAINT FK_Waiting FOREIGN KEY (WaitingResourceId) REFERENCES Resource(ResourceId)
 );
+--Bảng trung gian
+CREATE TABLE ProcessResource (
+    ProcessId INT,
+    ResourceId INT,
 
+    Allocation INT DEFAULT 0, -- đang giữ
+    Max INT DEFAULT 0,        -- tối đa cần 
+
+    PRIMARY KEY (ProcessId, ResourceId),
+    FOREIGN KEY (ProcessId) REFERENCES Process(ProcessId),
+    FOREIGN KEY (ResourceId) REFERENCES Resource(ResourceId)
+);
 -- 3. Chèn dữ liệu mẫu
-INSERT INTO Resources (ResourceName, IsShareable, HierarchyOrder, IsAvailable) VALUES 
-(N'Máy in (R1)', 0, 1, 1),
-(N'Máy quét (R2)', 0, 2, 1),
-(N'File Read-Only (R3)', 1, 3, 1);
+INSERT INTO Resource (ResourceName, IsShareable, HierarchyOrder) VALUES
+(N'R1 - Máy in', 0, 1),
+(N'R2 - Máy quét', 0, 2),
+(N'R3 - File ReadOnly', 0, 3),
+(N'R4 - RAM', 0, 4),
+(N'R5 - CPU', 1, 5);
 
-INSERT INTO Processes (ProcessName, Status, HoldingResourceId, WaitingResourceId) VALUES 
-(N'Tiến trình P1', 'Waiting', 1, 2), 
-(N'Tiến trình P2', 'Waiting', 2, 1); -- P2 giữ R2 đợi R1 (Đây là vòng lặp gây Deadlock)
+INSERT INTO Process (ProcessName, Status, HoldingResourceId, WaitingResourceId) VALUES
 
-select*from Resources
+(N'P1 - Chrome.exe', 'Waiting', 1, 2),
+(N'P2 - Word.exe', 'Waiting', 2, 3),
+(N'P3 - SQLServer.exe', 'Waiting', 3, 4),
+(N'P4 - VisualStudio.exe', 'Waiting', 4, 1),
+(N'P5 - BackupService', 'Waiting', 5, 1);
+
+INSERT INTO ProcessResource VALUES
+(1, 1, 1, 1),
+(1, 2, 0, 1),
+(2, 1, 0, 1),
+(2, 2, 1, 1);
+
+select*from Resource
+select *from Process
+select*from ProcessResource
+
