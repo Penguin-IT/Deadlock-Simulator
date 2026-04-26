@@ -1,0 +1,40 @@
+{
+    "ListResource": [
+        {
+            "ResourceId": 1,
+            "ResourceName": "CPU",
+            "IsShareable": false,
+            "Total": 4
+        },
+        {
+            "ResourceId": 2,
+            "ResourceName": "RAM",
+            "IsShareable": true,
+            "Total": 4
+        }
+    ],
+    "ListProcess": [
+        {
+            "ProcessName": "P_Stuck_A",
+            "Allocation": {
+                "1": 2,
+                "2": 1
+            },
+            "Max": {
+                "1": 4,
+                "2": 4
+            }
+        },
+        {
+            "ProcessName": "P_Stuck_B",
+            "Allocation": {
+                "1": 1,
+                "2": 2
+            },
+            "Max": {
+                "1": 4,
+                "2": 4
+            }
+        }
+    ]
+}

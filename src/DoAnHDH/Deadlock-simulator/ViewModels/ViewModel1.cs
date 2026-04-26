@@ -48,21 +48,19 @@ namespace Deadlock_simulator.ViewModels
 
         }
         // Tính toán tài nguyên có sẵn dựa trên tổng số lượng và số lượng đã cấp phát
-        private Dictionary<int, int> CalculateAvailable()
+       private Dictionary<int, int> CalculateAvailable()
         {
-            var available = new Dictionary<int, int>();
-
+                var available = new Dictionary<int, int>();
             foreach (var r in ListResource)
             {
                 int allocated = ListProcess
-                    .Where(p => p.Allocation.ContainsKey(r.ResourceId))
+                    .Where(p => p.Allocation != null && p.Allocation.ContainsKey(r.ResourceId))
                     .Sum(p => p.Allocation[r.ResourceId]);
 
                 available[r.ResourceId] = r.Total - allocated;
-            }
-
+                }
             return available;
-        }
+        }   
         // Kiểm tra nếu tài nguyên có thể dùng chung thì không cần xét đến nó trong việc phát hiện deadlock
         private bool IsShareableResource(Resource resource)
         {
@@ -79,8 +77,60 @@ namespace Deadlock_simulator.ViewModels
             {
                 if (HasCycle(node, graph, visited, stack)) return true;
             }
-            return false;
+            return ConfirmDeadlockMultiInstance(); // Kiểm tra thêm với thuật toán Banker nếu có tài nguyên đa thực thể
         }
+
+        public bool ConfirmDeadlockMultiInstance()
+{
+    // 1. Khởi tạo Work = Available hiện tại
+    var work = new Dictionary<int, int>(CalculateAvailable());
+    
+    // 2. Khởi tạo Finish
+    // Nếu Allocation = 0, coi như đã xong (true), ngược lại là false
+    var finish = ListProcess.ToDictionary(
+    p => p.ProcessName,
+    p => false
+);
+
+    bool progress;
+    do
+    {
+        progress = false;
+        foreach (var p in ListProcess.Where(proc => !finish[proc.ProcessName]))
+        {
+            // Kiểm tra: Yêu cầu hiện tại (Request) <= Work
+            // Lưu ý: Request ở đây là p.WaitingResourceId
+            bool canBeSatisfied = true;
+            
+            if (p.WaitingResourceId.HasValue)
+            {
+               foreach (var resId in p.Max.Keys)
+                {
+                    int need = p.Max[resId] - p.Allocation.GetValueOrDefault(resId, 0);
+                    if (need > work.GetValueOrDefault(resId, 0))
+                    {
+                        canBeSatisfied = false;
+                        break;
+                    }
+                }
+            }
+
+            if (canBeSatisfied)
+            {
+                // Giả định tiến trình này nhận được tài nguyên, chạy xong và trả lại toàn bộ
+                foreach (var alloc in p.Allocation)
+                {
+                    work[alloc.Key] = work.GetValueOrDefault(alloc.Key, 0) + alloc.Value;
+                }
+                finish[p.ProcessName] = true;
+                progress = true;
+            }
+        }
+    } while (progress);
+
+    // 3. Nếu tồn tại bất kỳ tiến trình nào Finish == false -> DEADLOCK THẬT
+    return finish.Values.Any(f => f == false);
+}
         //Ngăn chặn deadlock
 
         //Hạn chế tối đa việc cấp phát chưa cần thiết
@@ -104,47 +154,39 @@ namespace Deadlock_simulator.ViewModels
 
             return true;
         }
+// Xây dựng đồ thị Resource Allocation Graph từ dữ liệu hiện tại
+     private Dictionary<string, List<string>> BuildGraph()
+{
+    var map = new Dictionary<string, List<string>>();
+    var resources = ListResource.Where(r => !r.IsShareable).ToList();
+    var processes = ListProcess.ToList();
 
-        //Tạo đồ thị cấp phát và yêu cầu từ dữ liệu Process và Resource
-        private Dictionary<string, List<string>> BuildGraph()
-        {
-            var map = new Dictionary<string, List<string>>();
-            var processes = ListProcess.ToList();
-            var resources = ListResource.ToList();
+    foreach (var p in processes) map[p.ProcessName] = new List<string>();
+    foreach (var r in resources) map[r.ResourceName] = new List<string>();
 
-            foreach (var p in processes)
-            {
-                if (!map.ContainsKey(p.ProcessName))
-                    map[p.ProcessName] = new List<string>();
-
-                // 1. Allocation: Resource -> Process
-                if (p.HoldingResourceId != null)
-                {
-                    var res = resources.FirstOrDefault(r => r.ResourceId == p.HoldingResourceId);
-
-                    if (res != null && !res.IsShareable)
-                    {
-                        if (!map.ContainsKey(res.ResourceName))
-                            map[res.ResourceName] = new List<string>();
-
-                        map[res.ResourceName].Add(p.ProcessName);
-                    }
-                }
-
-                // 2. Request: Process -> Resource
-                if (p.WaitingResourceId != null)
-                {
-                    var res = resources.FirstOrDefault(r => r.ResourceId == p.WaitingResourceId);
-
-                    if (res != null)
-                    {
-                        map[p.ProcessName].Add(res.ResourceName);
-                    }
-                }
-            }
-
-            return map;
+    // 1. Cạnh Allocation: Resource -> Process
+    foreach (var res in resources)
+    {
+        // Duyệt qua tất cả những người đang giữ thực thể của Resource này
+       if (res.CurrentHolders != null)
+{
+    foreach (var holderName in res.CurrentHolders)
+            if (map.ContainsKey(res.ResourceName))
+                map[res.ResourceName].Add(holderName);
         }
+    }
+
+    // 2. Cạnh Request: Process -> Resource
+    foreach (var p in processes)
+    {
+        if (p.WaitingResourceId != null)
+        {
+            var res = resources.FirstOrDefault(r => r.ResourceId == p.WaitingResourceId);
+            if (res != null) map[p.ProcessName].Add(res.ResourceName);
+        }
+    }
+    return map;
+}
 
         // Dùng DFS để kiem tra trong đồ thị có chu trình không
         private bool HasCycle(string node, Dictionary<string, List<string>> Graph, HashSet<string> visited, HashSet<string> stack)
@@ -168,19 +210,6 @@ namespace Deadlock_simulator.ViewModels
             return false;
         }
 
-        // Phát hiện deadlock
-        public bool IsDeadlock()
-        {
-            var graph = BuildGraph();
-            HashSet<string> visited = new HashSet<string>();
-            HashSet<string> stack = new HashSet<string>();
-
-            foreach (var node in graph.Keys)
-            {
-                if (HasCycle(node, graph, visited, stack)) return true;
-            }
-            return false;
-        }
 
         //In ra chi tiết chu trình gây ra deadlock
 
@@ -231,157 +260,177 @@ namespace Deadlock_simulator.ViewModels
         }
 
         // Thu hồi tài nguyên mà tiến trình đang giữ bằng cách ưu tiên thu hồi tài nguyên không thể dùng chung trước, sau đó mới đến tài nguyên có thể dùng chung
-        public void RecoverByPreemption(int resourceId)
-        {
-            // Tìm tiến trình đang giữ tài nguyên này và bắt nó trả lại(set Holding = null)
-            var holder = ListProcess.FirstOrDefault(p => p.HoldingResourceId == resourceId);
-            if (holder != null)
-            {
-                holder.HoldingResourceId = null;
-                // Cập nhật vào Database
-                _db.UpdateProcess(holder);
-                MessageBox.Show($"Đã thu hồi tài nguyên {resourceId} từ {holder.ProcessName}");
-            }
-            LoadAllData(); // Load lại giao diện
+      public void RecoverByPreemption(int resourceId)
+{
+    var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
+    if (res == null) return;
+
+    // 1. Tìm tiến trình đang giữ dựa trên CurrentHolder của Resource
+    var holder = ListProcess.FirstOrDefault(p => p.ProcessName == res.CurrentHolder);
+    
+    if (holder != null)
+    {
+        // Giải phóng phía Process
+        holder.HoldingResourceId = null;
+        if (holder.Allocation.ContainsKey(resourceId))
+            holder.Allocation[resourceId] = 0;
+            
+        _db.UpdateProcess(holder); // Cập nhật xuống Database
+    }
+
+    // 2. GIẢI PHÓNG PHÍA RESOURCE
+    res.CurrentHolder = null; 
+
+    // 3. SAU KHI GIẢI PHÓNG, CẤP NGAY CHO TIẾN TRÌNH ĐANG ĐỢI (Nếu có)
+    if (res.WaitingQueue != null && res.WaitingQueue.Count > 0)
+    {
+        var nextProcess = res.WaitingQueue.Dequeue();
+        
+        res.CurrentHolder = nextProcess.ProcessName;
+        nextProcess.HoldingResourceId = resourceId;
+        nextProcess.WaitingResourceId = null; // Phá vỡ cạnh đợi trên đồ thị
+        
+        _db.UpdateProcess(nextProcess);
+        MessageBox.Show($"Đã thu hồi từ {holder?.ProcessName} và cấp cho {nextProcess.ProcessName}");
+    }
+    
+    LoadAllData(); 
         }
 
         //hàm kiểm tra trạng thái an toàn của hệ thống (Safe State)
-        public bool IsSafeState()
+       public bool IsSafeState()
         {
+            // 1. Tạo bản Clone của Available (Work)
             var work = new Dictionary<int, int>(CalculateAvailable());
-
-            var finish = ListProcess.ToDictionary(p => p.ProcessName, p => false);
+            
+            // 2. Tạo bản Clone của Finish
+                    var finish = ListProcess.ToDictionary(p => p.ProcessName, p => false);
 
             bool progress;
-
-            do
-            {
-                progress = false;
-
+            do {
+                    progress = false;
                 foreach (var p in ListProcess)
-                {
-                    if (finish[p.ProcessName]) continue;
-                    bool canRun = true;
+                {            if (finish[p.ProcessName]) continue;
 
+                    // Kiểm tra: Need <= Work
+                    bool canFinish = true;
                     foreach (var resId in p.Max.Keys)
                     {
-                        int allocation = p.Allocation.GetValueOrDefault(resId, 0);
-                        int need = p.Max[resId] - allocation;
-
+                        int need = p.Max[resId] - p.Allocation.GetValueOrDefault(resId, 0);
                         if (need > work.GetValueOrDefault(resId, 0))
                         {
-                            canRun = false;
+                            canFinish = false;
                             break;
                         }
-                    }
+                            }
 
-                    if (canRun)
+                    if (canFinish)
                     {
-                        // trả tài nguyên lại
-                        foreach (var resId in p.Allocation.Keys)
+                        // Giả định tiến trình xong -> Trả lại toàn bộ Allocation vào Work
+                        foreach (var alloc in p.Allocation)
                         {
-                            work[resId] += p.Allocation[resId];
-                        }
-
+                            work[alloc.Key] = work.GetValueOrDefault(alloc.Key, 0) + alloc.Value;
+                            }
                         finish[p.ProcessName] = true;
                         progress = true;
                     }
                 }
-
-            } while (progress);
+                } while (progress);
 
             return finish.Values.All(f => f);
         }
         //Trả về chuỗi an toàn nếu có, nếu không có thì trả về chuỗi rỗng
-        public (bool isSafe, List<string> sequence) GetSafeSequence()
+  public (bool isSafe, List<string> sequence) GetSafeSequence()
+{
+    var work = CalculateAvailable();
+    var finish = ListProcess.ToDictionary(p => p.ProcessName, _ => false);
+    var sequence = new List<string>();
+
+    bool found;
+    do
+    {
+        found = false;
+        foreach (var p in ListProcess.Where(p => !finish[p.ProcessName]))
         {
-            var work = new Dictionary<int, int>(CalculateAvailable());
-            var finish = ListProcess.ToDictionary(p => p.ProcessName, p => false);
-            var sequence = new List<string>();
-
-            bool progress;
-
-            do
+            bool canFinish = ListResource.All(r =>
             {
-                progress = false;
+                int resId = r.ResourceId;
+                int need = Math.Max(0,
+                    p.Max.GetValueOrDefault(resId, 0) -
+                    p.Allocation.GetValueOrDefault(resId, 0));
 
-                foreach (var p in ListProcess)
-                {
-                    if (finish[p.ProcessName]) continue;
+                return need <= work.GetValueOrDefault(resId, 0);
+            });
 
-                    bool canRun = true;
+            if (!canFinish) continue;
 
-                    foreach (var resId in p.Max.Keys)
-                    {
-                        int need = p.Max[resId] - p.Allocation.GetValueOrDefault(resId, 0);
+            // giải phóng tài nguyên
+            foreach (var alloc in p.Allocation)
+            {
+                work[alloc.Key] = work.GetValueOrDefault(alloc.Key, 0) + alloc.Value;
+            }
 
-                        if (need > work.GetValueOrDefault(resId, 0))
-                        {
-                            canRun = false;
-                            break;
-                        }
-                    }
-
-                    if (canRun)
-                    {
-                        foreach (var resId in p.Allocation.Keys)
-                        {
-                            work[resId] += p.Allocation[resId];
-                        }
-
-                        finish[p.ProcessName] = true;
-                        sequence.Add(p.ProcessName);
-                        progress = true;
-                    }
-                }
-
-            } while (progress);
-
-            bool isSafe = finish.Values.All(f => f);
-            return (isSafe, sequence);
+            finish[p.ProcessName] = true;
+            sequence.Add(p.ProcessName);
+            found = true;
         }
 
+    } while (found);
+    return (finish.Values.All(f => f), sequence);
+}
+
+
         // Kiểm tra yêu cầu tài nguyên theo thuật toán Banker có được chấp nhận không
-        public bool RequestResources(Process p, Dictionary<int, int> request)
+    public bool RequestResource(Process p, int resourceId, int amount)
         {
             var available = CalculateAvailable();
+            var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
+            if (res == null) return false;
 
-            // 1. Check request <= Need
-            foreach (var resId in request.Keys)
+            // --- LOGIC NGĂN CHẶN (PREVENTION) ---
+            // Kiểm tra thứ tự phân cấp (Circular Wait Prevention)
+            if (!res.IsShareable && !PreventCircularWait(p, res))
             {
-                int need = p.Max[resId] - p.Allocation.GetValueOrDefault(resId, 0);
-
-                if (request[resId] > need)
-                    return false;
+                MessageBox.Show("Vi phạm thứ tự tài nguyên!");
+                return false;
             }
+
+            // --- LOGIC TRÁNH Deadlock (AVOIDANCE) ---
+            // 1. Check request <= Need
+            int need = p.Max.GetValueOrDefault(resourceId, 0) - p.Allocation.GetValueOrDefault(resourceId, 0);
+            if (amount > need) return false;
 
             // 2. Check request <= Available
-            foreach (var resId in request.Keys)
+            if (amount > available.GetValueOrDefault(resourceId, 0))
             {
-                if (request[resId] > available.GetValueOrDefault(resId, 0))
-                    return false;
+                p.WaitingResourceId = resourceId;
+                if (!res.WaitingQueue.Contains(p)) res.WaitingQueue.Enqueue(p);
+                
+                // Kiểm tra xem việc đợi này có gây Deadlock thật không (Detection)
+                if (ConfirmDeadlockMultiInstance()) 
+                {
+                    MessageBox.Show("Phát hiện Deadlock thật sự!");
+                }
+                return false;
             }
 
-            // 3. Thử cấp phát tạm thời
-            foreach (var resId in request.Keys)
-            {
-                available[resId] -= request[resId];
-                p.Allocation[resId] = p.Allocation.GetValueOrDefault(resId, 0) + request[resId];
-            }
+            // 3. Thử cấp phát (Banker Test)
+            p.Allocation[resourceId] = p.Allocation.GetValueOrDefault(resourceId, 0) + amount;
 
-            // 4. Check SAFE
             if (IsSafeState())
             {
-                return true; // OK
+                // cấp chính thức
+                if (res.CurrentHolders == null) res.CurrentHolders = new List<string>();
+                for (int i = 0; i < amount; i++) res.CurrentHolders.Add(p.ProcessName);
+                
+                p.WaitingResourceId = null;
+                _db.UpdateProcess(p);
+                return true;
             }
             else
             {
-                // rollback
-                foreach (var resId in request.Keys)
-                {
-                    available[resId] += request[resId];
-                    p.Allocation[resId] -= request[resId];
-                }
+                //roollback
+                p.Allocation[resourceId] -= amount;
                 return false;
             }
         }
@@ -417,14 +466,60 @@ namespace Deadlock_simulator.ViewModels
 
             LoadAllData();
         }
+
+        // thử hàm mới xem được Không
+public void AnalyzeMinimumRecovery()
+{
+    // 1. Lấy tài nguyên hiện có
+    var available = CalculateAvailable();
+    
+    // 2. Lọc ra các tiến trình đang đợi (Waiting) và chưa hoàn thành
+    var stuckProcesses = ListProcess.Where(p => p.WaitingResourceId != null).ToList();
+
+    if (!stuckProcesses.Any()) return;
+// chọn tiến trình có số lượng tài nguyên còn thiếu ít nhất để giải phóng nhanh nhất
+    var bestCandidate = stuckProcesses
+        .Select(p => new {
+            Process = p,
+            // Tính số lượng còn thiếu của tài nguyên nó đang đợi
+            MissingAmount = CalculateMissing(p, available)
+        })
+        .OrderBy(x => x.MissingAmount)
+        .FirstOrDefault();
+
+    if (bestCandidate != null && bestCandidate.MissingAmount > 0)
+    {
+        var res = ListResource.FirstOrDefault(r => r.ResourceId == bestCandidate.Process.WaitingResourceId);
+        
+        MessageBox.Show($"[Phân tích] Để giải phóng Deadlock nhanh nhất:\n" +
+                        $"- Ưu tiên : {bestCandidate.Process.ProcessName}\n" +
+                        $"- Tài nguyên đang đợi: {res?.ResourceName}\n" +
+                        $"- Số lượng cần thêm: {bestCandidate.MissingAmount} đơn vị.");
+    }
+}
+// Hàm tính toán số lượng tài nguyên còn thiếu để tiến trình có thể tiếp tục
+    private int CalculateMissing(Process p, Dictionary<int, int> available)
+    {
+        if (p.WaitingResourceId == null) return 0;
+        
+        int resId = p.WaitingResourceId.Value;
+        // Need thực tế = Max[resId] - Allocation[resId]
+        int need = p.Max.ContainsKey(resId) ? (p.Max[resId] - p.Allocation.GetValueOrDefault(resId, 0)) : 1;
+        int currentAvailable = available.GetValueOrDefault(resId, 0);
+        
+        return need > currentAvailable ? (need - currentAvailable) : 0;
+    }
+
+
+// Thử tới đây
+
+
         // Tải lại dữ liệu từ database
         public void LoadAllData()
         {
-            var service = new DatabaseService();
-
+                var service = new DatabaseService();
             var reData = service.GetAllResources();
-            ListResource = new ObservableCollection<Resource>(reData);
-
+                ListResource = new ObservableCollection<Resource>(reData);
             var proData = service.GetAllProcesses();
             ListProcess = new ObservableCollection<Process>(proData);
             //khởi tạo mặc i=định cho Max và Allocation nếu null để tránh lỗi khi truy cập
@@ -437,8 +532,6 @@ namespace Deadlock_simulator.ViewModels
                     p.Allocation = new Dictionary<int, int>();
             }
         }
-
-
 
 
     }
