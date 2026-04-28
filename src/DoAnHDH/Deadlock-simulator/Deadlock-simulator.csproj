@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Core\DataGridCorecs" />
+    <None Include="Core\DataGridHelper.cs" />
   </ItemGroup>
 
 </Project>

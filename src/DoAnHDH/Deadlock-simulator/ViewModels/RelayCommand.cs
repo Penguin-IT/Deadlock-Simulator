@@ -63,19 +63,10 @@ namespace Deadlock_simulator.ViewModels
         /// <summary>
         /// Sự kiện báo cho UI khi trạng thái CanExecute thay đổi
         /// </summary>
-        public event EventHandler CanExecuteChanged;
-
-        /// <summary>
-        /// Gọi để cập nhật lại CanExecute, khiến UI kiểm tra lại trạng thái enable/disable
-        /// </summary>
-        public void RaiseCanExecuteChanged()
+        public event EventHandler CanExecuteChanged
         {
-            EventHandler handler = CanExecuteChanged;
-
-            if (handler != null)
-            {
-                handler(this, EventArgs.Empty);
-            }
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
         }
     }
         

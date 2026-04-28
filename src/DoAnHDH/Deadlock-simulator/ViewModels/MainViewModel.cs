@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Deadlock_simulator.Models;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -37,9 +38,12 @@ namespace Deadlock_simulator.ViewModels
         }
 
         // ===== DATA =====
+        public ObservableCollection<MatrixRow> AllocationMatrix { get; set; } = new();
+        public ObservableCollection<MatrixRow> MaxMatrix { get; set; } = new();
+        public ObservableCollection<DataGridColumn> AllocationColumns { get; set; } = new();
+        public ObservableCollection<DataGridColumn> MaxColumns { get; set; } = new();
         public ObservableCollection<string> Resources { get; set; } = new();
-        public ObservableCollection<MatrixRow> Matrix { get; set; } = new();
-        public ObservableCollection<DataGridColumn> Columns { get; set; } = new();
+        public ObservableCollection<ResourceValue> Available { get; set; } = new();
 
         // ===== COMMAND =====
         public ICommand AddProcessCommand { get; }
@@ -57,61 +61,53 @@ namespace Deadlock_simulator.ViewModels
         // ===== BUILD COLUMNS =====
         private void BuildColumns()
         {
-            Columns.Clear();
+            AllocationColumns.Clear();
+            MaxColumns.Clear();
 
-            // Process column
-            Columns.Add(new DataGridTextColumn
+            // ===== CỘT PROCESS =====
+            var processCol = new DataGridTextColumn
             {
                 Header = "Process",
                 Binding = new Binding("ProcessName"),
-                Width = 120,
+                Width = 120
+            };
 
-                ElementStyle = new Style(typeof(TextBlock))
-                {
-                    Setters =
-                    {
-                        new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center),
-                        new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center)
-                    }
-                }
+            AllocationColumns.Add(processCol);
+            MaxColumns.Add(new DataGridTextColumn
+            {
+                Header = "Process",
+                Binding = new Binding("ProcessName"),
+                Width = 120
             });
 
-            // Resource columns
+            // ===== CỘT RESOURCE =====
             for (int i = 0; i < Resources.Count; i++)
             {
                 int index = i;
 
-                Columns.Add(new DataGridTextColumn
+                var col1 = new DataGridTextColumn
                 {
                     Header = Resources[index],
-                    Width = 60,
-
-                    Binding = new Binding($"Values[{index}]")
+                    Binding = new Binding($"Values[{index}].Value")
                     {
                         Mode = BindingMode.TwoWay,
                         UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
-                    },
-
-                    ElementStyle = new Style(typeof(TextBlock))
-                    {
-                        Setters =
-                        {
-                            new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center),
-                            new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center)
-                        }
-                    },
-
-                    EditingElementStyle = new Style(typeof(TextBox))
-                    {
-                        Setters =
-                        {
-                            new Setter(TextBox.TextAlignmentProperty, TextAlignment.Center)
-                        }
                     }
-                });
-            }
+                };
 
-            OnPropertyChanged(nameof(Columns)); 
+                var col2 = new DataGridTextColumn
+                {
+                    Header = Resources[index],
+                    Binding = new Binding($"Values[{index}].Value")
+                    {
+                        Mode = BindingMode.TwoWay,
+                        UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                    }
+                };
+
+                AllocationColumns.Add(col1);
+                MaxColumns.Add(col2);
+            }
         }
 
         // ===== ADD RESOURCE =====
@@ -119,16 +115,25 @@ namespace Deadlock_simulator.ViewModels
         {
             if (string.IsNullOrWhiteSpace(NewResourceName)) return;
 
-            Resources.Add(NewResourceName);
-
-            // thêm cột vào tất cả process
-            foreach (var row in Matrix)
+            if (Resources.Any(r => r.Equals(NewResourceName, StringComparison.OrdinalIgnoreCase)))
             {
-                row.Values.Add(0);
+                MessageBox.Show("Resource đã tồn tại!!!");
+                return;
             }
-
-            BuildColumns(); // Cập nhật UI
-
+            Resources.Add(NewResourceName);
+            // Allocation
+            foreach (var row in AllocationMatrix)
+                row.Values.Add(new ResourceValue { Value = 0 });
+            // Max
+            foreach (var row in MaxMatrix)
+                row.Values.Add(new ResourceValue { Value = 0 });
+            // Available
+            Available.Add(new ResourceValue
+            {
+                Name = NewResourceName,
+                Value = 0
+            });
+            BuildColumns();
             NewResourceName = "";
         }
 
@@ -137,19 +142,20 @@ namespace Deadlock_simulator.ViewModels
         {
             if (string.IsNullOrWhiteSpace(NewProcessName)) return;
 
-            var row = new MatrixRow
+            if (AllocationMatrix.Any(p => p.ProcessName.Equals(NewProcessName, StringComparison.OrdinalIgnoreCase)))
             {
-                ProcessName = NewProcessName
-            };
-
-            // tạo số cột = số resource
+                MessageBox.Show("Process đã tồn tại!!!");
+                return;
+            }
+            var row1 = new MatrixRow { ProcessName = NewProcessName };
+            var row2 = new MatrixRow { ProcessName = NewProcessName };
             for (int i = 0; i < Resources.Count; i++)
             {
-                row.Values.Add(0);
+                row1.Values.Add(new ResourceValue { Value = 0 });
+                row2.Values.Add(new ResourceValue { Value = 0 });
             }
-
-            Matrix.Add(row);
-
+            AllocationMatrix.Add(row1);
+            MaxMatrix.Add(row2);
             NewProcessName = "";
         }
     }
