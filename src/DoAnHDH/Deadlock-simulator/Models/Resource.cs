@@ -34,6 +34,15 @@ namespace Deadlock_simulator.Models
                 _total = value;
             }
         }
+        private string _currentHolder;
+        public string CurrentHolder 
+        { 
+            get => _currentHolder; 
+            set => SetProperty(ref _currentHolder, value); 
+        }
+
+        public List<string> CurrentHolders { get; set; } = new List<string>();
+        public Queue<Process> WaitingQueue { get; set; } = new Queue<Process>();
     }
 } 
 

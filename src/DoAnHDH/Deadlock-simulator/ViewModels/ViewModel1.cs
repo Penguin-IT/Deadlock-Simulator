@@ -67,18 +67,28 @@ namespace Deadlock_simulator.ViewModels
             return resource != null && resource.IsShareable;
         }
          // Phát hiện deadlock
-        public bool IsDeadlock()
-        {
-            var graph = BuildGraph();
-            HashSet<string> visited = new HashSet<string>();
-            HashSet<string> stack = new HashSet<string>();
+      public bool IsDeadlock()
+{
+    var graph = BuildGraph();
 
-            foreach (var node in graph.Keys)
-            {
-                if (HasCycle(node, graph, visited, stack)) return true;
-            }
-            return ConfirmDeadlockMultiInstance(); // Kiểm tra thêm với thuật toán Banker nếu có tài nguyên đa thực thể
+    bool hasCycle = false;
+    HashSet<string> visited = new();
+    HashSet<string> stack = new();
+
+    foreach (var node in graph.Keys)
+    {
+        if (HasCycle(node, graph, visited, stack))
+        {
+            hasCycle = true;
+            break;
         }
+    }
+
+    if (!hasCycle) return false;
+
+    // Nếu có cycle → phải confirm bằng Banker
+    return ConfirmDeadlockMultiInstance();
+}
 
         public bool ConfirmDeadlockMultiInstance()
 {
@@ -434,6 +444,61 @@ namespace Deadlock_simulator.ViewModels
                 return false;
             }
         }
+
+
+private void UpdateAllocation(Process p, Resource r, int amount)
+{
+    if (p == null || r == null || amount == 0) return;
+// Khởi tạo nếu null để tránh lỗi khi truy cập
+    p.Allocation ??= new Dictionary<int, int>();
+    r.CurrentHolders ??= new List<string>();
+    r.WaitingQueue ??= new Queue<Process>();
+
+    int currentAlloc = p.Allocation.GetValueOrDefault(r.ResourceId, 0);
+    int newAlloc = currentAlloc + amount;
+// Kiểm tra nếu Allocation âm sẽ gây gây lỗi
+    if (newAlloc < 0)
+        throw new InvalidOperationException("Allocation âm!");
+
+    // bên Process cập nhật Allocation
+    if (newAlloc > 0)
+        p.Allocation[r.ResourceId] = newAlloc;
+    else
+        p.Allocation.Remove(r.ResourceId);
+
+    // bên Resource cập nhật CurrentHolders
+    if (amount > 0)
+    {
+        for (int i = 0; i < amount; i++)
+            r.CurrentHolders.Add(p.ProcessName);
+
+        // kiểm tra hoàn thành toàn bộ
+        bool finished = p.Max.All(kv =>
+        {
+            int need = kv.Value - p.Allocation.GetValueOrDefault(kv.Key, 0);
+            return need <= 0;
+        });
+// Nếu hoàn thành, loại bỏ khỏi hàng đợi chờ và reset WaitingResourceId
+        if (finished)
+        {
+            r.WaitingQueue = new Queue<Process>(
+                r.WaitingQueue.Where(x => x.ProcessId != p.ProcessId)
+            );
+            p.WaitingResourceId = null;
+        }
+    }
+    else
+    {
+        int toRemove = Math.Min(currentAlloc, Math.Abs(amount));
+        for (int i = 0; i < toRemove; i++)
+        {
+            int index = r.CurrentHolders.IndexOf(p.ProcessName);
+            if (index >= 0)
+                r.CurrentHolders.RemoveAt(index);
+        }
+    }
+}
+
         // Ngăn chặn đợi vòng tròn bằng cách yêu cầu các tiến trình phải yêu cầu tài nguyên theo thứ tự phân cấp (hierarchical ordering)
         private bool PreventCircularWait(Process p, Resource requested)
         {
