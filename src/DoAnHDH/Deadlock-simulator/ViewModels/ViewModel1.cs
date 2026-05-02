@@ -425,7 +425,7 @@ namespace Deadlock_simulator.ViewModels
             }
 
             // 3. Thử cấp phát (Banker Test)
-            p.Allocation[resourceId] = p.Allocation.GetValueOrDefault(resourceId, 0) + amount;
+            UpdateAllocation(p, res, amount);
 
             if (IsSafeState())
             {
@@ -523,13 +523,17 @@ private void UpdateAllocation(Process p, Resource r, int amount)
 
             foreach (var resId in victim.Allocation.Keys.ToList())
             {
-                victim.Allocation[resId] = 0;
+                var res = ListResource.FirstOrDefault(r => r.ResourceId == resId);
+                if (res != null)
+                {
+                    UpdateAllocation(victim, res, -victim.Allocation[resId]);
+                }
             }
 
             _db.UpdateProcess(victim);
             MessageBox.Show($"Đã thu hồi tài nguyên từ {victim.ProcessName}");
 
-            LoadAllData();
+  
         }
 
         // thử hàm mới xem được Không
@@ -576,7 +580,7 @@ public void AnalyzeMinimumRecovery()
     }
 
 
-// Thử tới đây
+
 
 
         // Tải lại dữ liệu từ database
