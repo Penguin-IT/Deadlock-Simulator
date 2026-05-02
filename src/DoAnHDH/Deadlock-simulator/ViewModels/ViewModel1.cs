@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using Deadlock_simulator.Models;
 using Deadlock_simulator.Services;
+usng System.Diagnostics;
 
 namespace Deadlock_simulator.ViewModels
 {
@@ -98,9 +99,9 @@ namespace Deadlock_simulator.ViewModels
     // 2. Khởi tạo Finish
     // Nếu Allocation = 0, coi như đã xong (true), ngược lại là false
     var finish = ListProcess.ToDictionary(
-    p => p.ProcessName,
-    p => false
-);
+        p => p.ProcessName,
+        p => p.Allocation.Values.Sum() == 0
+    );
 
     bool progress;
     do
@@ -271,41 +272,38 @@ namespace Deadlock_simulator.ViewModels
 
         // Thu hồi tài nguyên mà tiến trình đang giữ bằng cách ưu tiên thu hồi tài nguyên không thể dùng chung trước, sau đó mới đến tài nguyên có thể dùng chung
       public void RecoverByPreemption(int resourceId)
-{
-    var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
-    if (res == null) return;
+      {
+          var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
+          if (res == null) return;
 
-    // 1. Tìm tiến trình đang giữ dựa trên CurrentHolder của Resource
-    var holder = ListProcess.FirstOrDefault(p => p.ProcessName == res.CurrentHolder);
-    
-    if (holder != null)
-    {
-        // Giải phóng phía Process
-        holder.HoldingResourceId = null;
-        if (holder.Allocation.ContainsKey(resourceId))
-            holder.Allocation[resourceId] = 0;
-            
-        _db.UpdateProcess(holder); // Cập nhật xuống Database
-    }
+          // 1. Tìm tiến trình đang giữ
+          var holderName = res.CurrentHolders?.FirstOrDefault();
+          var holder = holderName != null ? ListProcess.FirstOrDefault(p => p.ProcessName == holderName) : null;
+          
+          if (holder != null)
+          {
+              // Giải phóng phía Process
+              UpdateAllocation(holder, res, -1);
+              _db.UpdateProcess(holder); // Cập nhật xuống Database
+          }
 
-    // 2. GIẢI PHÓNG PHÍA RESOURCE
-    res.CurrentHolder = null; 
+          // 3. SAU KHI GIẢI PHÓNG, CẤP NGAY CHO TIẾN TRÌNH ĐANG ĐỢI (Nếu có)
+          if (res.WaitingQueue != null && res.WaitingQueue.Count > 0)
+          {
+              var nextProcess = res.WaitingQueue.Peek();
+              UpdateAllocation(nextProcess, res, 1);
+              
+              // Đảm bảo phá vỡ trạng thái chờ
+              if (res.WaitingQueue.Contains(nextProcess)) {
+                  res.WaitingQueue = new Queue<Process>(res.WaitingQueue.Where(x => x.ProcessId != nextProcess.ProcessId));
+                  nextProcess.WaitingResourceId = null;
+              }
 
-    // 3. SAU KHI GIẢI PHÓNG, CẤP NGAY CHO TIẾN TRÌNH ĐANG ĐỢI (Nếu có)
-    if (res.WaitingQueue != null && res.WaitingQueue.Count > 0)
-    {
-        var nextProcess = res.WaitingQueue.Dequeue();
-        
-        res.CurrentHolder = nextProcess.ProcessName;
-        nextProcess.HoldingResourceId = resourceId;
-        nextProcess.WaitingResourceId = null; // Phá vỡ cạnh đợi trên đồ thị
-        
-        _db.UpdateProcess(nextProcess);
-        MessageBox.Show($"Đã thu hồi từ {holder?.ProcessName} và cấp cho {nextProcess.ProcessName}");
-    }
-    
-    LoadAllData(); 
-        }
+              _db.UpdateProcess(nextProcess);
+              Console.WriteLine($"Đã thu hồi 1 đơn vị từ {holder?.ProcessName} và cấp cho {nextProcess.ProcessName}");
+          }
+          
+          LoadAllData(); 
 
         //hàm kiểm tra trạng thái an toàn của hệ thống (Safe State)
        public bool IsSafeState()
@@ -401,7 +399,6 @@ namespace Deadlock_simulator.ViewModels
             // Kiểm tra thứ tự phân cấp (Circular Wait Prevention)
             if (!res.IsShareable && !PreventCircularWait(p, res))
             {
-                MessageBox.Show("Vi phạm thứ tự tài nguyên!");
                 return false;
             }
 
@@ -419,7 +416,7 @@ namespace Deadlock_simulator.ViewModels
                 // Kiểm tra xem việc đợi này có gây Deadlock thật không (Detection)
                 if (ConfirmDeadlockMultiInstance()) 
                 {
-                    MessageBox.Show("Phát hiện Deadlock thật sự!");
+                    Console.WriteLine("Phát hiện Deadlock thật sự!");
                 }
                 return false;
             }
@@ -502,12 +499,57 @@ private void UpdateAllocation(Process p, Resource r, int amount)
         // Ngăn chặn đợi vòng tròn bằng cách yêu cầu các tiến trình phải yêu cầu tài nguyên theo thứ tự phân cấp (hierarchical ordering)
         private bool PreventCircularWait(Process p, Resource requested)
         {
-            if (p.HoldingResourceId == null) return true;
+            if (p.Allocation == null || !p.Allocation.Any(a => a.Value > 0)) return true;
 
-            var held = ListResource.FirstOrDefault(r => r.ResourceId == p.HoldingResourceId);
-            if (held == null) return true;
-            return requested.HierarchyOrder > held.HierarchyOrder;
+            var maxHeldOrder = p.Allocation.Where(a => a.Value > 0)
+                                           .Select(a => ListResource.FirstOrDefault(r => r.ResourceId == a.Key)?.HierarchyOrder ?? -1)
+                                           .Max();
+
+            return requested.HierarchyOrder > maxHeldOrder;
         }
+
+   // Gán thứ tự phân cấp cho tài nguyên dựa trên độ khan hiếm và mức độ tranh chấp
+        public void AssignOrderByScarcity()
+        {
+            if (ListResource == null || !ListResource.Any()) return;
+
+            const int STEP = 10;
+
+            try
+            {
+                // 1. Tiền tính toán số lượng tiến trình đang đợi cho từng tài nguyên để tối ưu hiệu năng sắp xếp
+                var waitingCounts = ListProcess
+                    .Where(p => p.WaitingResourceId != null)
+                    .GroupBy(p => p.WaitingResourceId.Value)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                // 2. Sắp xếp tài nguyên theo chiến lược Ngăn chặn Deadlock (Prevention)
+                // Chiến lược: Tài nguyên dồi dào, dễ mượn, ít tranh chấp -> ID thấp (lấy trước)
+                //             Tài nguyên khan hiếm, đang bị nghẽn -> ID cao (lấy sau)
+                var sortedResources = ListResource
+                    .OrderByDescending(r => r.Total)                                // Ưu tiên số lượng nhiều trước
+                    .ThenBy(r => waitingCounts.GetValueOrDefault(r.ResourceId, 0))   // Ưu tiên tài nguyên ít bị tranh chấp
+                    .ThenByDescending(r => r.IsShareable)                           // Tài nguyên dùng chung được ưu tiên ID thấp
+                    .ThenBy(r => r.ResourceId)                                      // Đảm bảo thứ tự duy nhất
+                    .ToList();
+
+                // 3. Gán thứ tự mới
+                int currentOrder = STEP;
+                foreach (var r in sortedResources)
+                {
+                    r.HierarchyOrder = currentOrder;
+                    currentOrder += STEP;
+                }
+
+           OnPropertyChanged(nameof(ListResource));
+
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Lỗi khi gán thứ tự phân cấp: " + ex.Message);
+            }
+        }
+        
         public Process SelectVictim()
         {
             return ListProcess
@@ -531,7 +573,7 @@ private void UpdateAllocation(Process p, Resource r, int amount)
             }
 
             _db.UpdateProcess(victim);
-            MessageBox.Show($"Đã thu hồi tài nguyên từ {victim.ProcessName}");
+            Debug.WriteLine($"Đã thu hồi tài nguyên từ {victim.ProcessName}");
 
   
         }
@@ -559,8 +601,7 @@ public void AnalyzeMinimumRecovery()
     if (bestCandidate != null && bestCandidate.MissingAmount > 0)
     {
         var res = ListResource.FirstOrDefault(r => r.ResourceId == bestCandidate.Process.WaitingResourceId);
-        
-        MessageBox.Show($"[Phân tích] Để giải phóng Deadlock nhanh nhất:\n" +
+        Debug.WriteLine($"[Phân tích] Để giải phóng Deadlock nhanh nhất:\n" +
                         $"- Ưu tiên : {bestCandidate.Process.ProcessName}\n" +
                         $"- Tài nguyên đang đợi: {res?.ResourceName}\n" +
                         $"- Số lượng cần thêm: {bestCandidate.MissingAmount} đơn vị.");
