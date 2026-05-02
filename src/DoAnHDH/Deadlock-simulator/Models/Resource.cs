@@ -37,8 +37,8 @@ namespace Deadlock_simulator.Models
         private string _currentHolder;
         public string CurrentHolder 
         { 
-            get => _currentHolder; 
-            set => SetProperty(ref _currentHolder, value); 
+            get => _currentHolder;
+            set => _currentHolder = value;
         }
 
         public List<string> CurrentHolders { get; set; } = new List<string>();

@@ -9,17 +9,13 @@ namespace Deadlock_simulator.ViewModels
 {
     public class RelayCommand : ICommand
     {
-        // Action thực hiện khi Command được gọi
+        
         private readonly Action<object> _execute;
 
-        // Predicate kiểm tra xem Command có thể thực hiện hay không
+      
         private readonly Predicate<object> _canExecute;
 
-        /// <summary>a
-        /// Constructor chính, nhận action và predicate
-        /// </summary>
-        /// <param name="execute">Hành động sẽ thực hiện khi command được gọi</param>
-        /// <param name="canExecute">Điều kiện cho phép thực thi, có thể null</param>
+       
         public RelayCommand(Action<object> execute, Predicate<object> canExecute)
         {
             if (execute == null)
@@ -31,16 +27,12 @@ namespace Deadlock_simulator.ViewModels
             _canExecute = canExecute;
         }
 
-        /// <summary>
-        /// Kiểm tra xem Command có thể thực thi hay không
-        /// </summary>
-        /// <param name="parameter">Tham số truyền từ UI (có thể null)</param>
-        /// <returns>true nếu có thể thực thi, false nếu không</returns>
+        
         public bool CanExecute(object parameter)
         {
             if (_canExecute == null)
             {
-                return true; // Nếu không có điều kiện thì luôn có thể thực thi
+                return true; 
             }
             else
             {
@@ -48,10 +40,7 @@ namespace Deadlock_simulator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Thực hiện hành động khi Command được gọi
-        /// </summary>
-        /// <param name="parameter">Tham số truyền từ UI (có thể null)</param>
+        
         public void Execute(object parameter)
         {
             if (_execute != null)
@@ -60,9 +49,7 @@ namespace Deadlock_simulator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Sự kiện báo cho UI khi trạng thái CanExecute thay đổi
-        /// </summary>
+       
         public event EventHandler CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }

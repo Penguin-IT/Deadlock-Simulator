@@ -37,13 +37,13 @@ namespace Deadlock_simulator.Core
 
             if (e.NewValue is ObservableCollection<DataGridColumn> columns)
             {
-                //add lần đầu
+               
                 foreach (var col in columns)
                 {
                     grid.Columns.Add(col);
                 }
 
-                //update khi collection thay đổi
+               
                 columns.CollectionChanged += (s, ev) =>
                 {
                     if (ev.Action == NotifyCollectionChangedAction.Reset)

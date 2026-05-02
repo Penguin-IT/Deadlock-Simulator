@@ -5,12 +5,15 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:helper="clr-namespace:Deadlock_simulator.Core"
         xmlns:local="clr-namespace:Deadlock_simulator.ViewModels"
+        xmlns:models="clr-namespace:Deadlock_simulator.Models"
         mc:Ignorable="d"
         Title="UI_Deadlock" Height="766" Width="1491" Background="#0B1220">
+    
     <Window.DataContext>
         <local:MainViewModel/>
     </Window.DataContext>
     <Window.Resources>
+        <models:CellColorConverter x:Key="CellColorConverter"/>
         <!-- BUTTON -->
         <Style x:Key="BtnStyle" TargetType="Button">
             <Setter Property="Margin" Value="5"/>
@@ -57,85 +60,97 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <!-- ===== BUTTON TOP ===== -->
-        <StackPanel Orientation="Horizontal"
-                    Grid.ColumnSpan="2"
-                    HorizontalAlignment="Center"
-                    Margin="0,0,0,20">
-            <Button Content="Kiểm tra Banker"
-                    Background="#22C55E"
-                    Width="130"
-                    Style="{StaticResource BtnStyle}"/> 
-            <Button Content="Phát hiện Deadlock"
-                    Background="#F59E0B"
-                    Width="130"
-                    Style="{StaticResource BtnStyle}"/> 
-            <Button Content="Phục hồi Deadlock"
-                    Background="#3B82F6"
-                    Width="130"
-                    Style="{StaticResource BtnStyle}"/> 
+        <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,0,0,20">
+
+            <Button Content="Nạp File JSON" Background="#8B5CF6" Width="130" 
+                    Style="{StaticResource BtnStyle}" Command="{Binding LoadJsonCommand}"/>
+
+            <!-- Ẩn các nút không thuộc Đề 12 Ngăn Chặn -->
+            <Button Content="Kiểm tra Banker" Visibility="Collapsed" Background="#22C55E" Width="130" 
+                    Style="{StaticResource BtnStyle}" Command="{Binding CheckBankerCommand}"/>
+            <Button Content="Phát hiện Deadlock" Visibility="Collapsed" Background="#F59E0B" Width="130" 
+                    Style="{StaticResource BtnStyle}" Command="{Binding DetectDeadlockCommand}"/>
+            <Button Content="Phục hồi Deadlock" Visibility="Collapsed" Background="#3B82F6" Width="130" 
+                    Style="{StaticResource BtnStyle}" Command="{Binding RecoverDeadlockCommand}"/>
+            
         </StackPanel>
+        
         <!-- ===== INPUT PANEL ===== -->
         <Border Grid.Row="1" Grid.Column="0"
-                Background="#1E293B"
-                CornerRadius="15"
-                Padding="20">
-            <StackPanel>
-                <TextBlock Text="PROCESS"
-                           Foreground="#94A3B8"
-                           FontWeight="Bold"
-                           FontSize="14"/>
-                <TextBox Style="{StaticResource TextBoxStyle}"
-                         Text="{Binding NewProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <Button Content="+ Thêm Process"
-                        Style="{StaticResource BtnStyle}"
-                        Background="#6366F1"
-                        Command="{Binding AddProcessCommand}"/> 
-                <TextBlock Text="RESOURCE"
-                           Foreground="#94A3B8"
-                           FontWeight="Bold"
-                           Margin="0,20,0,0"
-                           FontSize="14"/>
-                <TextBox Style="{StaticResource TextBoxStyle}"
-                         Text="{Binding NewResourceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <Button Content="+ Thêm Resource"
-                        Style="{StaticResource BtnStyle}"
-                        Background="#6366F1"
-                        Command="{Binding AddResourceCommand}"/>    
-                <Separator Margin="0,20"/>
-                <TextBlock Text="DANH SÁCH HIỆN TẠI"
-                           Foreground="#94A3B8"
-                           FontWeight="Bold"
-                           Margin="0,10,0,5"/>
-                <TextBlock Text="• Processes"
-                           Foreground="White"/>
-                <ScrollViewer Height="80"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding AllocationMatrix}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding ProcessName}"
-                           Foreground="#38BDF8"
-                           Margin="2"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-                <TextBlock Text="• Resources"
-                            Foreground="White"
-                            Margin="0,10,0,0"/>
-                <ScrollViewer Height="80"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Resources}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}"
-                                           Foreground="#22C55E"
-                                           Margin="2"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
+        Background="#1E293B"
+        CornerRadius="15"
+        Padding="10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="5">
+                <StackPanel Margin="5">
+
+                    <TextBlock Text="PROCESS" Foreground="#94A3B8" FontWeight="Bold" FontSize="14"/>
+                    <TextBox Style="{StaticResource TextBoxStyle}" Text="{Binding NewProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Content="+ Thêm Process"
+                    Style="{StaticResource BtnStyle}"
+                    Background="#6366F1"
+                    Command="{Binding AddProcessCommand}"/>
+
+                    <TextBlock Text="RESOURCE"
+                       Foreground="#94A3B8"
+                       FontWeight="Bold"
+                       Margin="0,20,0,0"
+                       FontSize="14"/>
+                    <TextBox Style="{StaticResource TextBoxStyle}"
+                     Text="{Binding NewResourceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Content="+ Thêm Resource"
+                    Style="{StaticResource BtnStyle}"
+                    Background="#6366F1"
+                    Command="{Binding AddResourceCommand}"/>
+
+                    <Separator Margin="0,20"/>
+                    <TextBlock Text="DANH SÁCH HIỆN TẠI"
+                       Foreground="#94A3B8"
+                       FontWeight="Bold"
+                       Margin="0,10,0,5"/>
+
+                    <TextBlock Text="• Processes" Foreground="White"/>
+                    <ScrollViewer Height="80" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding AllocationMatrix}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ProcessName}" Foreground="#38BDF8" Margin="2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Text="• Resources" Foreground="White" Margin="0,10,0,0"/>
+                    <ScrollViewer Height="80" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Resources}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="#22C55E" Margin="2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!--  (REQUEST) -->
+                    <Separator Margin="0,20"/>
+                    <TextBlock Text="CẤP PHÁT ĐỘNG (REQUEST)" Foreground="#E2E8F0" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
+
+                    <TextBlock Text="Chọn Tiến trình:" Foreground="#94A3B8" Margin="0,0,0,5"/>
+                    <ComboBox ItemsSource="{Binding AllocationMatrix}" DisplayMemberPath="ProcessName" 
+                      SelectedValuePath="ProcessName" SelectedValue="{Binding SelectedProcessName, Mode=TwoWay}" 
+                      Height="30" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Chọn Tài nguyên:" Foreground="#94A3B8" Margin="0,0,0,5"/>
+                    <ComboBox ItemsSource="{Binding Resources}" 
+                      SelectedValue="{Binding SelectedResourceName, Mode=TwoWay}" 
+                      Height="30" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Số lượng muốn xin:" Foreground="#94A3B8" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding RequestAmount, Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBoxStyle}"/>
+
+                    <Button Content="Gửi Yêu Cầu Xin Tài Nguyên" Style="{StaticResource BtnStyle}" 
+                    Background="#10B981" Command="{Binding RequestResourceCommand}"/>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
         <!-- ===== DATAGRID AREA ===== -->
         <Grid Grid.Row="1" Grid.Column="1" Margin="20">
@@ -164,7 +179,33 @@
                       CanUserAddRows="False"
                       GridLinesVisibility="All"
                       HorizontalGridLinesBrush="#334155"
-                      VerticalGridLinesBrush="#334155"/>
+                      VerticalGridLinesBrush="#334155">
+                        <DataGrid.CellStyle>
+                            <Style TargetType="DataGridCell">
+
+                             
+                                <Setter Property="Foreground" Value="White"/>
+
+                                <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+
+                                
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource CellColorConverter}">
+
+                                          
+                                            <Binding />
+
+                                            
+                                            <Binding RelativeSource="{RelativeSource Self}" Path="Column.Header" />
+
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+
+                            </Style>
+                        </DataGrid.CellStyle>
+                    </DataGrid>
                 </DockPanel>
             </Border>
             <!-- ===== MAX ===== -->
@@ -202,7 +243,7 @@
                        Foreground="White"
                        FontWeight="Bold"
                        Margin="0,0,0,10"/>
-                    <ItemsControl ItemsSource="{Binding Available}">
+                    <ItemsControl ItemsSource="{Binding AvailableResources}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel/>
@@ -210,27 +251,51 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#111827"
-                                        BorderBrush="#3B82F6"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Margin="5"
-                                        Padding="8">
+                                <Border Background="#111827" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="8" Margin="5" Padding="10" Width="150">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Name}"
-                                                   Foreground="#38BDF8"
-                                                   FontWeight="Bold"
-                                                   HorizontalAlignment="Center"/>
+                                       
+                                        <TextBlock Text="{Binding ResourceName}" Foreground="#38BDF8" FontWeight="Bold" HorizontalAlignment="Center" FontSize="14"/>
 
-                                        <TextBox Width="80"
-                                                 Height="35"
-                                                 TextAlignment="Center"
-                                                 HorizontalContentAlignment="Center"
-                                                 VerticalContentAlignment="Center"
-                                                 Background="#0F172A"
-                                                 Foreground="White"
-                                                 BorderBrush="#3B82F6"
-                                                 Text="{Binding Value, Mode=TwoWay}"/>
+                                        
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
+                                            <TextBlock Text="Bậc: " Foreground="#94A3B8" FontSize="11"/>
+                                            <TextBlock Text="{Binding HierarchyOrder}" Foreground="#F59E0B" FontWeight="Bold" FontSize="11"/>
+                                        </StackPanel>
+
+                                        
+                                        <Border CornerRadius="4" Padding="4,2" HorizontalAlignment="Center" Margin="0,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsShareable}" Value="True">
+                                                            <Setter Property="Background" Value="#065F46"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsShareable}" Value="False">
+                                                            <Setter Property="Background" Value="#991B1B"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="10" Foreground="White" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsShareable}" Value="True">
+                                                                <Setter Property="Text" Value="Dùng Chung"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsShareable}" Value="False">
+                                                                <Setter Property="Text" Value="Độc Quyền"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+
+                                        <Separator Margin="0,8" Background="#334155"/>
+
+                                        <TextBlock Text="Còn dư:" Foreground="#94A3B8" FontSize="10" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Total}" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="16"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

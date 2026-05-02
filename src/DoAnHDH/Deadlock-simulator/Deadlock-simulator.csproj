@@ -15,4 +15,10 @@
   <None Include="Core\DataGridHelper.cs" />
 </ItemGroup>
 
+  <ItemGroup>
+    <None Update="data\data_antoan.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -14,14 +14,14 @@ using System.Windows.Shapes;
 
 namespace Deadlock_simulator.Views
 {
-    /// <summary>
-    /// Interaction logic for UI_Deadlock.xaml
-    /// </summary>
+        
     public partial class UI_Deadlock : Window
     {
         public UI_Deadlock()
         {
             InitializeComponent();
         }
+
+        
     }
 }
