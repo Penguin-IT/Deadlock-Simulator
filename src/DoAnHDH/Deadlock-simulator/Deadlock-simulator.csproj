@@ -10,14 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Core\" />
-    <Folder Include="Views\" />
-    <Folder Include="Views\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.72" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
-  </ItemGroup>
+  <Folder Include="Core\" />
+  <Folder Include="Views\" />
+  <None Include="Core\DataGridHelper.cs" />
+</ItemGroup>
 
 </Project>

@@ -1,0 +1,305 @@
+﻿<Window x:Class="Deadlock_simulator.Views.UI_Deadlock"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helper="clr-namespace:Deadlock_simulator.Core"
+        xmlns:local="clr-namespace:Deadlock_simulator.ViewModels"
+        mc:Ignorable="d"
+        Title="UI_Deadlock" Height="766" Width="1491" Background="#0B1220">
+    <Window.DataContext>
+        <local:MainViewModel/>
+    </Window.DataContext>
+    <Window.Resources>
+        <!-- BUTTON -->
+        <Style x:Key="BtnStyle" TargetType="Button">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="8"
+                        Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- TEXTBOX -->
+        <Style x:Key="TextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Margin" Value="0,6,0,12"/>
+            <Setter Property="Padding" Value="6"/>
+        </Style>
+        <DropShadowEffect x:Key="ShadowEffect"
+                          BlurRadius="10"
+                          ShadowDepth="0"
+                          Color="#000000"
+                          Opacity="0.5"/>
+
+    </Window.Resources>
+    <Grid Margin="20">
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- ===== BUTTON TOP ===== -->
+        <StackPanel Orientation="Horizontal"
+                    Grid.ColumnSpan="2"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,20">
+            <Button Content="Kiểm tra Banker"
+                    Background="#22C55E"
+                    Width="130"
+                    Style="{StaticResource BtnStyle}"/> 
+            <Button Content="Phát hiện Deadlock"
+                    Background="#F59E0B"
+                    Width="130"
+                    Style="{StaticResource BtnStyle}"/> 
+            <Button Content="Phục hồi Deadlock"
+                    Background="#3B82F6"
+                    Width="130"
+                    Style="{StaticResource BtnStyle}"/> 
+        </StackPanel>
+        <!-- ===== INPUT PANEL ===== -->
+        <Border Grid.Row="1" Grid.Column="0"
+                Background="#1E293B"
+                CornerRadius="15"
+                Padding="20">
+            <StackPanel>
+                <TextBlock Text="PROCESS"
+                           Foreground="#94A3B8"
+                           FontWeight="Bold"
+                           FontSize="14"/>
+                <TextBox Style="{StaticResource TextBoxStyle}"
+                         Text="{Binding NewProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Content="+ Thêm Process"
+                        Style="{StaticResource BtnStyle}"
+                        Background="#6366F1"
+                        Command="{Binding AddProcessCommand}"/> 
+                <TextBlock Text="RESOURCE"
+                           Foreground="#94A3B8"
+                           FontWeight="Bold"
+                           Margin="0,20,0,0"
+                           FontSize="14"/>
+                <TextBox Style="{StaticResource TextBoxStyle}"
+                         Text="{Binding NewResourceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Content="+ Thêm Resource"
+                        Style="{StaticResource BtnStyle}"
+                        Background="#6366F1"
+                        Command="{Binding AddResourceCommand}"/>    
+                <Separator Margin="0,20"/>
+                <TextBlock Text="DANH SÁCH HIỆN TẠI"
+                           Foreground="#94A3B8"
+                           FontWeight="Bold"
+                           Margin="0,10,0,5"/>
+                <TextBlock Text="• Processes"
+                           Foreground="White"/>
+                <ScrollViewer Height="80"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding AllocationMatrix}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding ProcessName}"
+                           Foreground="#38BDF8"
+                           Margin="2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Text="• Resources"
+                            Foreground="White"
+                            Margin="0,10,0,0"/>
+                <ScrollViewer Height="80"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Resources}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           Foreground="#22C55E"
+                                           Margin="2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+        <!-- ===== DATAGRID AREA ===== -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <!-- ===== ALLOCATION ===== -->
+            <Border Grid.Row="0"
+            CornerRadius="12"
+            BorderBrush="#334155"
+            BorderThickness="1"
+            Background="#0F172A"
+            Padding="10"
+            Margin="0,0,0,15">
+                <DockPanel>
+                    <TextBlock Text="ALLOCATION"
+                       Foreground="White"
+                       FontWeight="Bold"
+                       Margin="0,0,0,10"
+                       DockPanel.Dock="Top"/>
+                    <DataGrid ItemsSource="{Binding AllocationMatrix}"
+                      AutoGenerateColumns="False"
+                      helper:DataGridHelper.BindableColumns="{Binding AllocationColumns}"
+                      CanUserAddRows="False"
+                      GridLinesVisibility="All"
+                      HorizontalGridLinesBrush="#334155"
+                      VerticalGridLinesBrush="#334155"/>
+                </DockPanel>
+            </Border>
+            <!-- ===== MAX ===== -->
+            <Border Grid.Row="1"
+                    CornerRadius="12"
+                    BorderBrush="#334155"
+                    BorderThickness="1"
+                    Background="#0F172A"
+                    Padding="10"
+                    Margin="0,0,0,15">
+                <DockPanel>
+                    <TextBlock Text="MAX"
+                               Foreground="White"
+                               FontWeight="Bold"
+                               Margin="0,0,0,10"
+                               DockPanel.Dock="Top"/>
+                    <DataGrid ItemsSource="{Binding MaxMatrix}"
+                              AutoGenerateColumns="False"
+                              helper:DataGridHelper.BindableColumns="{Binding MaxColumns}"
+                              CanUserAddRows="False"
+                              GridLinesVisibility="All"
+                              HorizontalGridLinesBrush="#334155"
+                              VerticalGridLinesBrush="#334155"/>
+                </DockPanel>
+            </Border>
+            <!-- ===== AVAILABLE ===== -->
+            <Border Grid.Row="2"
+                    Background="#0F172A"
+                    BorderBrush="#334155"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="10">
+                <StackPanel>
+                    <TextBlock Text="AVAILABLE"
+                       Foreground="White"
+                       FontWeight="Bold"
+                       Margin="0,0,0,10"/>
+                    <ItemsControl ItemsSource="{Binding Available}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#111827"
+                                        BorderBrush="#3B82F6"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Margin="5"
+                                        Padding="8">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="#38BDF8"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"/>
+
+                                        <TextBox Width="80"
+                                                 Height="35"
+                                                 TextAlignment="Center"
+                                                 HorizontalContentAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="#0F172A"
+                                                 Foreground="White"
+                                                 BorderBrush="#3B82F6"
+                                                 Text="{Binding Value, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== STYLE ===== -->
+        <Grid.Resources>
+            <!-- TEXTBOX -->
+            <Style x:Key="TextBoxStyle" TargetType="TextBox">
+                <Setter Property="Height" Value="32"/>
+                <Setter Property="Margin" Value="0,6,0,12"/>
+                <Setter Property="Background" Value="#0F172A"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="BorderBrush" Value="#6366F1"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="6"/>
+            </Style>
+            <!-- ===== DATAGRID STYLE ===== -->
+            <Style TargetType="DataGrid">
+                <Setter Property="Background" Value="#0F172A"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="RowHeight" Value="45"/>
+                <Setter Property="HeadersVisibility" Value="Column"/>
+            </Style>
+
+            <!-- HEADER -->
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGridColumnHeader">
+                            <Border CornerRadius="5"
+                        Background="#3B82F6"
+                        Padding="10">
+                                <ContentPresenter HorizontalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- CELL -->
+            <Style TargetType="DataGridCell">
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+                <Setter Property="BorderThickness" Value="0"/>
+            </Style>
+
+            <!-- ROW -->
+            <Style TargetType="DataGridRow">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Background" Value="#0F172A"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#1E293B"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="#334155"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Resources>
+    </Grid>
+</Window>
