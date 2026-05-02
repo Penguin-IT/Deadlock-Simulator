@@ -10,7 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="Core\DataGridHelper.cs" />
-  </ItemGroup>
+  <Folder Include="Core\" />
+  <Folder Include="Views\" />
+  <None Include="Core\DataGridHelper.cs" />
+</ItemGroup>
 
 </Project>
