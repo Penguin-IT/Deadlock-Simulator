@@ -388,62 +388,59 @@ namespace Deadlock_simulator.ViewModels
     return (finish.Values.All(f => f), sequence);
 }
 
+// Yêu cầu tài nguyên cho tiến trình, trả về true nếu được cấp phát, false nếu bị từ chối
+   public bool RequestResource(Process p, int resourceId, int amount, bool isRetry = false)
+{
+    var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
+    if (res == null) return false;
 
-        // Kiểm tra yêu cầu tài nguyên theo thuật toán Banker có được chấp nhận không
-    public bool RequestResource(Process p, int resourceId, int amount)
-        {
-            var available = CalculateAvailable();
-            var res = ListResource.FirstOrDefault(r => r.ResourceId == resourceId);
-            if (res == null) return false;
+    // --- PREVENTION ---
+    if (!res.IsShareable && !PreventCircularWait(p, res))
+    {
+        if (isRetry) return false; //tránh loop vô hạn
 
-            // --- LOGIC NGĂN CHẶN (PREVENTION) ---
-            // Kiểm tra thứ tự phân cấp (Circular Wait Prevention)
-            if (!res.IsShareable && !PreventCircularWait(p, res))
-            {
-                Console.WriteLine("Vi phạm thứ tự tài nguyên!");
-                return false;
-            }
+        var violatingResources = p.Allocation
+            .Where(a => a.Value > 0)
+            .Select(a => ListResource.FirstOrDefault(r => r.ResourceId == a.Key))
+            .Where(r => r != null && r.HierarchyOrder > res.HierarchyOrder)
+            .ToList();
 
-            // --- LOGIC TRÁNH Deadlock (AVOIDANCE) ---
-            // 1. Check request <= Need
-            int need = p.Max.GetValueOrDefault(resourceId, 0) - p.Allocation.GetValueOrDefault(resourceId, 0);
-            if (amount > need) return false;
+        foreach (var v in violatingResources)
+            ReleaseResourceCompletely(p, v);
 
-            // 2. Check request <= Available
-            if (amount > available.GetValueOrDefault(resourceId, 0))
-            {
-                p.WaitingResourceId = resourceId;
-                if (!res.WaitingQueue.Contains(p)) res.WaitingQueue.Enqueue(p);
-                
-                // Kiểm tra xem việc đợi này có gây Deadlock thật không (Detection)
-                if (ConfirmDeadlockMultiInstance()) 
-                {
-                    Console.WriteLine("Phát hiện Deadlock thật sự!");
-                }
-                return false;
-            }
+        return RequestResource(p, resourceId, amount, true); // retry 1 lần
+    }
 
-            // 3. Thử cấp phát (Banker Test)
-            UpdateAllocation(p, res, amount);
+    // kiểm tra nếu yêu cầu vượt quá Need thì từ chối
+    int need = p.Max.GetValueOrDefault(resourceId, 0)
+              - p.Allocation.GetValueOrDefault(resourceId, 0);
+    if (amount > need) return false;
 
-            if (IsSafeState())
-            {
-                // cấp chính thức
-                if (res.CurrentHolders == null) res.CurrentHolders = new List<string>();
-                for (int i = 0; i < amount; i++) res.CurrentHolders.Add(p.ProcessName);
-                
-                p.WaitingResourceId = null;
-                _db.UpdateProcess(p);
-                return true;
-            }
-            else
-            {
-                //roollback
-                p.Allocation[resourceId] -= amount;
-                return false;
-            }
-        }
+    // kiểm tra nếu yêu cầu vượt quá Available thì từ chối và cho vào hàng đợi chờ
+    var available = CalculateAvailable();
+    if (amount > available.GetValueOrDefault(resourceId, 0))
+    {
+        p.WaitingResourceId = resourceId;
+        if (!res.WaitingQueue.Contains(p)) res.WaitingQueue.Enqueue(p);
+        return false;
+    }
 
+    // kiểm tra lại trạng thái an toàn sau khi giả định cấp phát
+    UpdateAllocation(p, res, amount);
+
+    if (IsSafeState())
+    {
+        CommitAllocation(p, res, amount);
+        p.WaitingResourceId = null; //xoa trạng thái chờ nếu có
+        return true;
+    }
+    else
+    {
+        UpdateAllocation(p, res, -amount);
+        p.WaitingResourceId = null; 
+        return false;
+    }
+}
 
 private void UpdateAllocation(Process p, Resource r, int amount)
 {
@@ -457,8 +454,9 @@ private void UpdateAllocation(Process p, Resource r, int amount)
     int newAlloc = currentAlloc + amount;
 // Kiểm tra nếu Allocation âm sẽ gây gây lỗi
     if (newAlloc < 0)
-        throw new InvalidOperationException("Allocation âm!");
-
+    {
+        return;
+    }
     // bên Process cập nhật Allocation
     if (newAlloc > 0)
         p.Allocation[r.ResourceId] = newAlloc;
@@ -505,7 +503,7 @@ private void UpdateAllocation(Process p, Resource r, int amount)
 
             var maxHeldOrder = p.Allocation.Where(a => a.Value > 0)
                                            .Select(a => ListResource.FirstOrDefault(r => r.ResourceId == a.Key)?.HierarchyOrder ?? -1)
-                                           .Max();
+                                       ests    .Max();
 
             return requested.HierarchyOrder > maxHeldOrder;
         }
@@ -514,6 +512,7 @@ private void UpdateAllocation(Process p, Resource r, int amount)
         public void AssignOrderByScarcity()
         {
             if (ListResource == null || !ListResource.Any()) return;
+            if (ListResource.All(r => r.HierarchyOrder != 0)) return;
 
             const int STEP = 10;
 
