@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -304,6 +304,7 @@ namespace Deadlock_simulator.ViewModels
           }
           
           LoadAllData(); 
+      }
 
         //hàm kiểm tra trạng thái an toàn của hệ thống (Safe State)
        public bool IsSafeState()
@@ -399,6 +400,7 @@ namespace Deadlock_simulator.ViewModels
             // Kiểm tra thứ tự phân cấp (Circular Wait Prevention)
             if (!res.IsShareable && !PreventCircularWait(p, res))
             {
+                Console.WriteLine("Vi phạm thứ tự tài nguyên!");
                 return false;
             }
 
