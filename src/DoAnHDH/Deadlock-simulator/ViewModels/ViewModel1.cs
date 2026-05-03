@@ -442,6 +442,19 @@ namespace Deadlock_simulator.ViewModels
     }
 }
 
+   private void ReleaseResourceCompletely(Process p, Resource r)
+    {
+        int currentAlloc = p.Allocation.GetValueOrDefault(r.ResourceId, 0);
+        if (currentAlloc <= 0) return;
+
+        UpdateAllocation(p, r, -currentAlloc);
+
+        if (p.WaitingResourceId == r.ResourceId)
+            p.WaitingResourceId = null;
+
+        _db.UpdateProcess(p);
+
+    }
 private void UpdateAllocation(Process p, Resource r, int amount)
 {
     if (p == null || r == null || amount == 0) return;
