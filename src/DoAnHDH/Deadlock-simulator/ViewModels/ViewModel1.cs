@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using Deadlock_simulator.Models;
 using Deadlock_simulator.Services;
-usng System.Diagnostics;
+using System.Diagnostics;
 
 namespace Deadlock_simulator.ViewModels
 {
