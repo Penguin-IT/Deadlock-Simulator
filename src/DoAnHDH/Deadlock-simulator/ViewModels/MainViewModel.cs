@@ -16,7 +16,7 @@ namespace Deadlock_simulator.ViewModels
 {
     public class MainViewModel : BaseViewModel
     {
-        
+
         private ViewModel1 _coreLogic;
         // ===== INPUT   =====
         private string _selectedProcessName;
@@ -61,6 +61,17 @@ namespace Deadlock_simulator.ViewModels
                 OnPropertyChanged(nameof(NewResourceName));
             }
         }
+        public bool IsSafeModeEnabled
+        {
+            get => _coreLogic.IsSafeModeEnabled;
+            set
+            {
+                _coreLogic.IsSafeModeEnabled = value;
+
+                OnPropertyChanged(nameof(IsSafeModeEnabled));
+            }
+
+        }
         public ObservableCollection<Resource> AvailableResources { get; set; } = new();
 
         // ===== DATA =====
@@ -86,7 +97,7 @@ namespace Deadlock_simulator.ViewModels
             AddProcessCommand = new RelayCommand(AddProcess, null);
             AddResourceCommand = new RelayCommand(AddResource, null);
             LoadJsonCommand = new RelayCommand(LoadDataFromJson, null);
-            CheckBankerCommand = new RelayCommand(ExecuteCheckBanker,null);
+            CheckBankerCommand = new RelayCommand(ExecuteCheckBanker, null);
             DetectDeadlockCommand = new RelayCommand(ExecuteDetectDeadlock, null);
             RecoverDeadlockCommand = new RelayCommand(ExecuteRecoverDeadlock, null);
             RequestResourceCommand = new RelayCommand(ExecuteRequestResource, null);
@@ -155,18 +166,41 @@ namespace Deadlock_simulator.ViewModels
                 MessageBox.Show("Resource đã tồn tại!!!");
                 return;
             }
+            // NEW
+            int newResId = _coreLogic.ListResource.Any() ? _coreLogic.ListResource.Max(x => x.ResourceId) + 1 : 1;
+            int newHierarchy = _coreLogic.ListResource.Any() ? _coreLogic.ListResource.Max(x => x.HierarchyOrder) + 1 : 1;
+
+
+            _coreLogic.ListResource.Add(new Resource
+            {
+                ResourceId = newResId,
+                ResourceName = NewResourceName,
+                Total = 10,
+                IsShareable = false,
+                HierarchyOrder = newHierarchy
+            });
+
+
+            foreach (var p in _coreLogic.ListProcess)
+            {
+                p.Allocation[newResId] = 0;
+                p.Max[newResId] = 0;
+            }
+
+
+
             Resources.Add(NewResourceName);
             // Allocation
             foreach (var row in AllocationMatrix)
-                row.Values.Add(new ResourceValue { Value = 0 });
+                row.Values.Add(new ResourceValue { Name = NewResourceName, Value = 0 });
             // Max
             foreach (var row in MaxMatrix)
-                row.Values.Add(new ResourceValue { Value = 0 });
+                row.Values.Add(new ResourceValue { Name = NewResourceName, Value = 0 });
             // Available
             Available.Add(new ResourceValue
             {
                 Name = NewResourceName,
-                Value = 0
+                Value = 10
             });
             BuildColumns();
             NewResourceName = "";
@@ -182,12 +216,32 @@ namespace Deadlock_simulator.ViewModels
                 MessageBox.Show("Process đã tồn tại!!!");
                 return;
             }
+            int newId = _coreLogic.ListProcess.Any() ? _coreLogic.ListProcess.Max(p => p.ProcessId) + 1 : 1;
+
+
+            var newProcess = new Process
+            {
+                ProcessId = newId,
+                ProcessName = NewProcessName,
+                Allocation = new Dictionary<int, int>(),
+                Max = new Dictionary<int, int>()
+            };
+
+
+            foreach (var r in _coreLogic.ListResource)
+            {
+                newProcess.Allocation[r.ResourceId] = 0;
+                newProcess.Max[r.ResourceId] = 0;
+            }
+
+
+            _coreLogic.ListProcess.Add(newProcess);
             var row1 = new MatrixRow { ProcessName = NewProcessName };
             var row2 = new MatrixRow { ProcessName = NewProcessName };
             for (int i = 0; i < Resources.Count; i++)
             {
-                row1.Values.Add(new ResourceValue { Value = 0 });
-                row2.Values.Add(new ResourceValue { Value = 0 });
+                row1.Values.Add(new ResourceValue { Name = Resources[i], Value = 0 });
+                row2.Values.Add(new ResourceValue { Name = Resources[i], Value = 0 });
             }
             AllocationMatrix.Add(row1);
             MaxMatrix.Add(row2);
@@ -198,10 +252,10 @@ namespace Deadlock_simulator.ViewModels
         {
             try
             {
-                // 1. Yêu cầu Lõi thuật toán gọi class DatabaseService của bạn để đọc JSON
+
                 _coreLogic.LoadAllData();
 
-                // 2. Vẽ dữ liệu đó lên DataGrid
+
                 SyncCoreToUI();
 
                 MessageBox.Show("Nạp dữ liệu JSON thành công!");
@@ -220,7 +274,7 @@ namespace Deadlock_simulator.ViewModels
             MaxMatrix.Clear();
             AvailableResources.Clear();
 
-           
+
             var actualAvailable = _coreLogic.CalculateAvailable();
             foreach (var r in _coreLogic.ListResource)
             {
@@ -246,7 +300,7 @@ namespace Deadlock_simulator.ViewModels
                 {
                     int val = p.Allocation.GetValueOrDefault(r.ResourceId, 0);
 
-                    // Chỉ gán Tên và Số lượng (Value)
+
                     allocRow.Values.Add(new ResourceValue { Name = r.ResourceName, Value = val });
 
                     maxRow.Values.Add(new ResourceValue
@@ -260,17 +314,36 @@ namespace Deadlock_simulator.ViewModels
                 MaxMatrix.Add(maxRow);
             }
 
-            
+
             UpdateMatrixColors();
+        }
+        private void SyncUIToCore()
+        {
+
+            foreach (var uiRow in MaxMatrix)
+            {
+                var coreProcess = _coreLogic.ListProcess.FirstOrDefault(p => p.ProcessName == uiRow.ProcessName);
+                if (coreProcess == null) continue;
+
+                foreach (var cell in uiRow.Values)
+                {
+                    var coreResource = _coreLogic.ListResource.FirstOrDefault(r => r.ResourceName == cell.Name);
+                    if (coreResource != null)
+                    {
+
+                        coreProcess.Max[coreResource.ResourceId] = cell.Value;
+                    }
+                }
+            }
         }
         private void ExecuteCheckBanker(object obj)
         {
-           
+
             bool isSafe = _coreLogic.IsSafeState();
 
             if (isSafe)
             {
-               
+
                 var result = _coreLogic.GetSafeSequence();
                 MessageBox.Show($"Hệ thống AN TOÀN!\nChuỗi cấp phát: {string.Join(" -> ", result.sequence)}", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -283,43 +356,47 @@ namespace Deadlock_simulator.ViewModels
         // ===== HÀM PHÁT HIỆN DEADLOCK =====
         private void ExecuteDetectDeadlock(object obj)
         {
-          
             bool isDeadlock = _coreLogic.IsDeadlock();
+
+            
+            UpdateMatrixColors();
 
             if (isDeadlock)
             {
-               
+             
                 string details = _coreLogic.GetDeadlockDetails();
-                MessageBox.Show($" PHÁT HIỆN DEADLOCK!\n{details}", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"PHÁT HIỆN DEADLOCK!\n{details}", "Cảnh báo",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else
             {
-                MessageBox.Show("Hệ thống hiện tại KHÔNG có Deadlock.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Hệ thống hiện tại KHÔNG có Deadlock.", "Thông báo",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
-
         // ===== HÀM PHỤC HỒI DEADLOCK =====
         private void ExecuteRecoverDeadlock(object obj)
         {
-            
+
             if (!_coreLogic.IsDeadlock())
             {
                 MessageBox.Show("Hệ thống đang an toàn, không có Deadlock để phục hồi!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-        
+
             _coreLogic.RecoverDeadlock();
 
-           
+
             SyncCoreToUI();
 
             MessageBox.Show("Đã hoàn tất quá trình giải phóng Deadlock và cập nhật giao diện!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         private void UpdateMatrixColors()
         {
-            bool systemDeadlock = _coreLogic.ConfirmDeadlockMultiInstance();
-            var deadlockedProcesses = _coreLogic.GetDeadlockDetails();
+           
+            var deadlockInfo = _coreLogic.GetDeadlockDetails();
+            bool hasCycle = deadlockInfo.Contains("Chu trình");
 
             foreach (var row in AllocationMatrix)
             {
@@ -331,25 +408,32 @@ namespace Deadlock_simulator.ViewModels
                     var r = _coreLogic.ListResource.FirstOrDefault(x => x.ResourceName == cell.Name);
                     if (r == null) continue;
 
-                    
                     cell.Status = "None";
 
-                    
-                    if (systemDeadlock && deadlockedProcesses.Contains(p.ProcessName))
-                        cell.Status = "Deadlock"; 
+                   
+                    if (hasCycle && deadlockInfo.Contains(p.ProcessName))
+                    {
+                        cell.Status = "Deadlock";
+                    }
+                  
                     else if (p.WaitingResourceId == r.ResourceId)
-                        cell.Status = "Waiting"; 
+                    {
+                        cell.Status = "Waiting";
+                    }
+                 
                     else if (p.Allocation.GetValueOrDefault(r.ResourceId, 0) > 0)
-                        cell.Status = "Holding"; 
+                    {
+                        cell.Status = "Holding";
+                    }
                 }
             }
 
-           
             System.Windows.Data.CollectionViewSource.GetDefaultView(AllocationMatrix).Refresh();
         }
         // ===== HÀM CẤP PHÁT TÀI NGUYÊN  =====
         private void ExecuteRequestResource(object obj)
         {
+            SyncUIToCore();
             if (string.IsNullOrEmpty(SelectedProcessName) || string.IsNullOrEmpty(SelectedResourceName) || RequestAmount <= 0)
             {
                 MessageBox.Show("Vui lòng chọn Tiến trình, Tài nguyên và nhập Số lượng > 0!", "Lỗi nhập liệu");
@@ -361,12 +445,12 @@ namespace Deadlock_simulator.ViewModels
 
             if (p != null && r != null)
             {
-               
+
                 bool success = _coreLogic.RequestResource(p, r.ResourceId, RequestAmount);
 
                 if (success)
                 {
-                   
+
                     MessageBox.Show($"Đã cấp phát thành công {RequestAmount} {r.ResourceName} cho {p.ProcessName}!");
                     SyncCoreToUI();
                 }
@@ -376,6 +460,6 @@ namespace Deadlock_simulator.ViewModels
                 }
             }
         }
-
+       
     }
 }

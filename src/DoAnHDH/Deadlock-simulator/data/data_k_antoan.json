@@ -1,17 +1,19 @@
 {
     "ListResource": [
-        {
-            "ResourceId": 1,
-            "ResourceName": "CPU",
-            "IsShareable": false,
-            "Total": 4
-        },
-        {
-            "ResourceId": 2,
-            "ResourceName": "RAM",
-            "IsShareable": true,
-            "Total": 4
-        }
+      {
+        "ResourceId": 1,
+        "ResourceName": "CPU",
+        "IsShareable": false,
+        "HierarchyOrder": 1,
+        "Total": 4
+      },
+      {
+        "ResourceId": 2,
+        "ResourceName": "RAM",
+        "IsShareable": true,
+        "HierarchyOrder": 2,
+        "Total": 4
+      }
     ],
     "ListProcess": [
         {

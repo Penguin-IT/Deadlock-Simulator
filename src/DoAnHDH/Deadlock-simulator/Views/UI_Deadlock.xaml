@@ -65,12 +65,12 @@
             <Button Content="Nạp File JSON" Background="#8B5CF6" Width="130" 
                     Style="{StaticResource BtnStyle}" Command="{Binding LoadJsonCommand}"/>
 
-            <!-- Ẩn các nút không thuộc Đề 12 Ngăn Chặn -->
-            <Button Content="Kiểm tra Banker" Visibility="Collapsed" Background="#22C55E" Width="130" 
+           
+            <Button Content="Kiểm tra Banker"  Background="#22C55E" Width="130" 
                     Style="{StaticResource BtnStyle}" Command="{Binding CheckBankerCommand}"/>
-            <Button Content="Phát hiện Deadlock" Visibility="Collapsed" Background="#F59E0B" Width="130" 
+            <Button Content="Phát hiện Deadlock"  Background="#F59E0B" Width="130" 
                     Style="{StaticResource BtnStyle}" Command="{Binding DetectDeadlockCommand}"/>
-            <Button Content="Phục hồi Deadlock" Visibility="Collapsed" Background="#3B82F6" Width="130" 
+            <Button Content="Phục hồi Deadlock"  Background="#3B82F6" Width="130" 
                     Style="{StaticResource BtnStyle}" Command="{Binding RecoverDeadlockCommand}"/>
             
         </StackPanel>
@@ -131,6 +131,11 @@
                     </ScrollViewer>
 
                     <!--  (REQUEST) -->
+                    <CheckBox Content="Bật Khiên Bảo Vệ (Banker &amp; Prevention)" 
+          IsChecked="{Binding IsSafeModeEnabled}" 
+          Foreground="White" 
+          FontWeight="Bold" 
+          Margin="0,0,0,10" />
                     <Separator Margin="0,20"/>
                     <TextBlock Text="CẤP PHÁT ĐỘNG (REQUEST)" Foreground="#E2E8F0" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
 
