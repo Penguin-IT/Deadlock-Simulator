@@ -68,9 +68,9 @@
            
             <Button Content="Kiểm tra Banker"  Background="#22C55E" Width="130" 
                     Style="{StaticResource BtnStyle}" Command="{Binding CheckBankerCommand}"/>
-            <Button Content="Phát hiện Deadlock"  Background="#F59E0B" Width="130" 
+            <Button Content="Phát hiện Deadlock"  Background="#F59E0B" Width="130" Visibility="Collapsed"
                     Style="{StaticResource BtnStyle}" Command="{Binding DetectDeadlockCommand}"/>
-            <Button Content="Phục hồi Deadlock"  Background="#3B82F6" Width="130" 
+            <Button Content="Phục hồi Deadlock"  Background="#3B82F6" Width="130" Visibility="Collapsed"
                     Style="{StaticResource BtnStyle}" Command="{Binding RecoverDeadlockCommand}"/>
             
         </StackPanel>
@@ -101,6 +101,10 @@
                     Style="{StaticResource BtnStyle}"
                     Background="#6366F1"
                     Command="{Binding AddResourceCommand}"/>
+                    <CheckBox Content="Tài nguyên dùng chung " 
+          IsChecked="{Binding IsNewResourceShareable}" 
+          Margin="0,10,0,10" 
+          Foreground="White"/>
 
                     <Separator Margin="0,20"/>
                     <TextBlock Text="DANH SÁCH HIỆN TẠI"

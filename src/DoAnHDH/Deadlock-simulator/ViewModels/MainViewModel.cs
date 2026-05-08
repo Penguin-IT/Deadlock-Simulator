@@ -72,6 +72,16 @@ namespace Deadlock_simulator.ViewModels
             }
 
         }
+        private bool _isNewResourceShareable;
+        public bool IsNewResourceShareable
+        {
+            get => _isNewResourceShareable;
+            set
+            {
+                _isNewResourceShareable = value;
+                OnPropertyChanged(nameof(IsNewResourceShareable));
+            }
+        }
         public ObservableCollection<Resource> AvailableResources { get; set; } = new();
 
         // ===== DATA =====
@@ -176,7 +186,7 @@ namespace Deadlock_simulator.ViewModels
                 ResourceId = newResId,
                 ResourceName = NewResourceName,
                 Total = 10,
-                IsShareable = false,
+                IsShareable = IsNewResourceShareable,
                 HierarchyOrder = newHierarchy
             });
 
